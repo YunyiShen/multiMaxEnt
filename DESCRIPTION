@@ -1,0 +1,11 @@
+Package: multiMaxEnt
+Type: Package
+Title: Multispecies MaxEnt Model Via Gibbs Point Process
+Version: 0.1.0
+Author: Yunyi Shen
+Maintainer: Yunyi Shen <yshen99@wisc.edu>
+Description: An experimental R package to fit a multispecies extension of maxent (more specific maxnet implementation) using its equivalence with Poisson and Gibbs point process.
+License: GPL (>=2)
+Encoding: UTF-8
+LazyData: true
+Import: spatstat.core
