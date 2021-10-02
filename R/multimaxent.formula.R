@@ -1,5 +1,5 @@
 #' @export
-maxnet.formula <-
+maxent.formula <-
 function(p, data, classes="default")
 {
    cont <- names(data)[sapply(data,class)!="factor"]
@@ -28,5 +28,5 @@ function(p, data, classes="default")
    }
    if (length(categorical))
       terms <- c(terms, paste("categorical(",categorical,")",sep="",collapse=" + "))
-   formula(paste("~", paste(terms, collapse = " + "), "-1"))
+   formula(paste("~", paste(terms, collapse = " + "), "-1")) # we want different first order potential for each species (i.e. "marks")
 }
