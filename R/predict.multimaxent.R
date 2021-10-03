@@ -10,17 +10,27 @@ predict.multimaxent <-
 function(object, locations, spp_list = object$spp_names, newdata, clamp=T, type=c("exponential","cloglog","logistic"))
 {
    spp_in <- intersect(object$spp_names, spp_list)
+
    if (clamp) {
-      for (v in intersect(names(object$varmax), names(newdata))) {
-         newdata[,v] <- pmin(pmax(newdata[,v], object$varmin[v]), object$varmax[v])
-      }
+     for (v in intersect(names(object$varmax), names(newdata))) {
+       newdata[,v] <- pmin(pmax(newdata[,v], object$varmin[v]), object$varmax[v])
+     }
    }
+   terms <- sub("hinge\\((.*)\\):(.*):(.*)$", "hingeval(\\1,\\2,\\3)", object$feature_name)
+   terms <- sub("categorical\\((.*)\\):(.*)$", "categoricalval(\\1,\"\\2\")", terms)
+   terms <- sub("thresholds\\((.*)\\):(.*)$", "thresholdval(\\1,\\2)", terms)
+   f <- formula(paste("~", paste(terms, collapse=" + "), "-1"))
+   mm <- model.matrix(f, data.frame(newdata))
+   if (clamp) mm <- t(pmin(pmax(t(mm), object$featuremins[object$feature_name]),
+                           object$featuremaxs[object$feature_name]))
+   mm <- as.data.frame(mm)
+   colnames(mm) <- paste0("x",1:ncol(mm))
 
    res <- lapply(spp_in, function(spp, spp_full,locations, newdata, ppm_fit){
       loci_df <- locations
       loci_df$marks <- factor(spp, levels = spp_list)
       predict(ppm_fit, location = loci_df, covariates = mm, type = "cif")
-   }, object$spp_names,locations, newdata, object$ppm_fit)
+   }, object$spp_names,locations, mm, object$ppm_fit)
    type <- match.arg(type)
    if (type=="exponential") return(res)
    if (type=="cloglog"){

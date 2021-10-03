@@ -49,7 +49,7 @@ function(p, # presence points, the third column should be species (or what ever 
       background_mask <- rasterToPolygons(env_layers[[1]])
    }
 
-   if(verbos) cat("generating background points...\n")
+   if(verbos) cat("generating background points...")
    dummy_points <- spsample(background_mask, n = n_background, type = type_background)
    rm(background_mask)
    dummy_points <- as.data.frame(dummy_points)
@@ -67,7 +67,7 @@ function(p, # presence points, the third column should be species (or what ever 
    env_dummy <- as.data.frame(env_dummy)
    if (anyNA(env_presence)|anyNA(env_dummy)) stop("NA values in data table. This is either because presence points outside the rasters or rasters are not properly alligned.")
 
-   if(verbos) cat("model fitting...\n")
+   if(verbos) cat("done\nmodel fitting...")
    if(class(f)=="function"){
      maxent_f <- f(p,env_presence,feature_classes)
    }
@@ -91,26 +91,35 @@ function(p, # presence points, the third column should be species (or what ever 
                                                   env_stack@extent[4])))# point pattern for presence
    Q <- quadscheme.logi(pp, dummy_pp)
 
+   browser()
+   mm <- as.data.frame( model.matrix(maxent_f, rbind(env_presence, env_dummy)))
+   feature_name <- colnames(mm)
+   colnames(mm) <- paste0("x",1:ncol(mm))
    # TODO: when too many features exits, we will have infinite coefficients in usual logistics, should move to elstic nets, go logistic.R and change it, together with predict.ppm
-   ppm_fit <- ppm(Q = Q,trend =maxent_f,
+   ppm_fit <- ppm(Q = Q,trend = ~marks+marks:.-1,
                   interaction = interaction,
-                  covariates = rbind(env_presence, env_dummy), method="logi",...)
+                  covariates = mm, method="logi",...)
 
    model <- list()
    model$ppm_fit <- ppm_fit
 
-   if(verbos) cat("calculating entropy...")
-   preds <- predict.ppm(object = ppm_fit, locations = dummy_pp, covariates = env_dummy, type = "cif")
+
+   if(verbos) cat("done\ncalculating entropy...")
+   preds <- predict.ppm(object = ppm_fit, locations = dummy_pp, covariates = mm[1:nrow(env_dummy)+nrow(env_presence),], type = "cif")
    raw <- lapply(spp_names,function(spp, preds, dummy_marks){
      preds[dummy_marks==spp]
    }, preds, dummy_marks)
-   model$entropy <- lapply(raw, function(rawi){-sum(rawi * log(rawi))})
    model$alpha <- lapply(raw,function(w){-log(sum(w))})
-   if(verbos) cat("finished")
+   raw <- lapply(raw, function(w){w/(sum(w))})
+   model$entropy <- lapply(raw, function(rawi){-sum(rawi * log(rawi))})
+
+   if(verbos) cat("finished\n")
    full_env <- rbind(env_presence, env_dummy)
    vv <- (sapply(full_env, class)!="factor")
    model$varmin <- apply(full_env[,vv, drop = FALSE], 2, min)
    model$varmax <- apply(full_env[,vv, drop = FALSE], 2, max)
+   model$featuremins <- apply(mm, 2, min)
+   model$featuremaxs <- apply(mm, 2, max)
    means <- apply(env_presence[,vv, drop = FALSE], 2, mean)
    majorities <- sapply(names(full_env)[!vv],
       function(n) which.max(table(full_env[p==1,n, drop = FALSE])))
@@ -120,6 +129,7 @@ function(p, # presence points, the third column should be species (or what ever 
    model$spp_names <- spp_names
    model$n_spp <- n_spp
    model$maxent_f <- maxent_f
-   cat("done")
+   model$feature_name <- feature_name
+   cat("done\n")
    model
 }
