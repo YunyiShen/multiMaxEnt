@@ -6,6 +6,8 @@
 #' @param f a function that make formula's for the fitting, default is the maxent's method, or a formula
 #' @param feature_classes feature classes used if f is maxent's feature generator
 #' @param interaction the interaction model for the species, default the multitype Strauss process with radii 1000 units (usually means 1km), see ?ppm for this, usual selection is HirStrauss or MultiStrauss depends on whether the interaction is symmetric
+#' @param regmult a constant to adjust regularization.
+#' @param regfun a function to compute regularization constant for each feature.
 #' @param addsamplestobackground bool whether to add the presence point to the background
 #' @param gitter noise added to the sample when adding to background, will be uniform [-gitter, gitter].
 #' @param n_background number of background points
@@ -21,7 +23,9 @@ function(p, # presence points, the third column should be species (or what ever 
          f = maxent.formula,
          feature_classes = "default",
          interaction = NULL,
-         addsamplestobackground=TRUE,
+         regmult = 1.0,
+         regfun = maxnet.default.regularization,
+         addsamplestobackground=FALSE,
          gitter = 0.5,
          n_background = 10000,
          type_background = "random",
@@ -91,14 +95,18 @@ function(p, # presence points, the third column should be species (or what ever 
                                                   env_stack@extent[4])))# point pattern for presence
    Q <- quadscheme.logi(pp, dummy_pp)
 
-   browser()
-   mm <- as.data.frame( model.matrix(maxent_f, rbind(env_presence, env_dummy)))
+   #browser()
+   mm <- as.data.frame( model.matrix(maxent_f, rbind(env_presence)))
+   reg <- regfun(mm) * regmult
+   mm <- rbind(mm,as.data.frame( model.matrix(maxent_f, rbind(env_dummy))))
    feature_name <- colnames(mm)
    colnames(mm) <- paste0("x",1:ncol(mm))
+   lambda=10^(seq(4,0,length.out=200))*sum(reg)/length(reg)*nrow(env_presence)/nrow(mm)
+   
    # TODO: when too many features exits, we will have infinite coefficients in usual logistics, should move to elstic nets, go logistic.R and change it, together with predict.ppm
-   ppm_fit <- ppm(Q = Q,trend = ~marks+marks:.-1,
+   ppm_fit <- maxnet.logi.engine(Q = Q,trend = ~marks+marks:.-1,
                   interaction = interaction,
-                  covariates = mm, method="logi",...)
+                  covariates = mm, penalty.factor = reg, lambda = lambda,...)
 
    model <- list()
    model$ppm_fit <- ppm_fit
