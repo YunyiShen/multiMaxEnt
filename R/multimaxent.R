@@ -97,14 +97,21 @@ function(p, # presence points, the third column should be species (or what ever 
 
    #browser()
    mm <- as.data.frame( model.matrix(maxent_f, rbind(env_presence)))
-   reg <- regfun(mm) * regmult
+   #reg <- regfun(mm) * regmult
+   reg <- lapply(1:n_spp, function(w,mm,regmult){regfun(mm) * regmult},mm,regmult )
+   reg <- Reduce(c, reg)
+   reg <- c(reg, rep(0,n_spp))
    mm <- rbind(mm,as.data.frame( model.matrix(maxent_f, rbind(env_dummy))))
    feature_name <- colnames(mm)
    colnames(mm) <- paste0("x",1:ncol(mm))
    lambda=10^(seq(4,0,length.out=200))*sum(reg)/length(reg)*nrow(env_presence)/nrow(mm)
    
    # TODO: when too many features exits, we will have infinite coefficients in usual logistics, should move to elstic nets, go logistic.R and change it, together with predict.ppm
-   ppm_fit <- maxnet.logi.engine(Q = Q,trend = ~marks+marks:.-1,
+   forla <- paste0("marks:x",1:ncol(mm))
+   forla <- paste(forla, collapse = "+")
+   forla <- paste0(c("~",forla,"+marks-1"),collapse = "")
+   forla <- as.formula(forla)
+   ppm_fit <- maxnet.logi.engine(Q = Q,trend = forla,
                   interaction = interaction,
                   covariates = mm, penalty.factor = reg, lambda = lambda,...)
 

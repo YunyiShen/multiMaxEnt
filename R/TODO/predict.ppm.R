@@ -399,7 +399,7 @@ predict.ppm <- local({
       } else covariates[covnames.needed]
       covfunargs <- model$covfunargs
       covariates.df <-
-        mpl.get.covariates(covariates,
+        spatstat.core:::mpl.get.covariates(covariates,
                            list(x=xpredict, y=ypredict),
                            "prediction points",
                            covfunargs)
@@ -422,8 +422,8 @@ predict.ppm <- local({
     if(!trivial) {
       Vnames <- model$internal$Vnames
       vnameprefix <- model$internal$vnameprefix
-      glmdata <- getglmdata(model)
-      glmfit <- getglmfit(model)
+      glmdata <- model$internal$glmdata
+      glmfit <- model$internal$glmfit
       if(object$method=="logi")
         newdata$.logi.B <- rep(glmdata$.logi.B[1], nrow(newdata))
     }

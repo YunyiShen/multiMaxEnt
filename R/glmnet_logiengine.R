@@ -1,7 +1,7 @@
 ## use glmnet to fit the Gibbs process, used some internal function in spatstat, developed under spatstat version 2.2.2
 
 maxnet.logi.engine <- function(Q,
-                        trend = ~1,
+                        trend = ~-1,
                         interaction,
                         penalty.factor,
                         lambda,
@@ -51,22 +51,11 @@ maxnet.logi.engine <- function(Q,
     if(!is.character(vnameprefix) || length(vnameprefix) != 1)
       stop("Internal error: illegal format of vnameprefix")
   }
-  # create dummy points
-  #if(inherits(Q, "ppp")){
-  #Xplus <- Q
-  #Q <- spatstat.geom::quadscheme.logi(Xplus, ...) # ignored, we will always give quadscheme
+  # dummy points
   D <- Q$dummy
   Dinfo <- Q$param
-  #} 
-  #else if(checkfields(Q, c("data", "dummy"))) {
-  #  Xplus <- Q$data
-  #  D <- Q$dummy
-  #  Dinfo <- Q$param
-  #  if(is.null(Dinfo)){
-  #    Dinfo <- list(how="given", rho=npoints(D)/(area(D)*markspace.integral(D)))
-  #  }
-  #  Q <- quadscheme.logi(Xplus, D)
-  #} else stop("Format of object Q is not understood")
+  Xplus <- Q$data
+  
   ## clip to subset?
   if(!is.null(clipwin)) {
     if(is.data.frame(covariates)) {
@@ -181,7 +170,8 @@ maxnet.logi.engine <- function(Q,
       VN[IsOffset] <- paste("offset(", VN[IsOffset], ")", sep="")
     offset_vec <- rowSums(as.matrix(glmdata[,VN[IsOffset]])) # get this part of offset
     #glmdata <- glmdata[,!colnames(glmdata)%in% VN[IsOffset]] # remove offset
-    #fmla <- paste(c(fmla, VN), collapse="+")
+    fmla <- paste(c(fmla, VN), collapse="+")
+    penalty.factor <- c(penalty.factor, rep(0,length(VN)))
   }
   # add offset intrinsic to logistic technique
   #fmla <- paste(fmla, "offset(-log(.logi.B))", sep="+")
@@ -202,22 +192,17 @@ maxnet.logi.engine <- function(Q,
   fit <- glmnet::glmnet(x=Xmat[.logi.ok,], y=as.factor(.logi.Y[.logi.ok]), 
     family="binomial", standardize=F, 
     penalty.factor=penalty.factor, 
-    lambda=lambda, weights=weights)
-  #fit <- if(VB) 
-  #         vblogit.fmla(fmla, data = glmdata, 
-  #                      subset = .logi.ok, weights = .logi.w, ...)
-  #       else 
-  #         glm(fmla, data = glmdata, 
-  #             family = binomial(), subset = .logi.ok, weights = .logi.w)
+    lambda=lambda, weights=.logi.w[.logi.ok], offset = offset_vec[.logi.ok])
+  
   environment(fit$terms) <- sys.frame(sys.nframe())
   ## Fitted coeffs
   co <- coef(fit)
-  fitin <- spatstat.core:::fii(interaction, co, Vnames, IsOffset)
-
+  fitin <- spatstat.core:::fii(interaction, as.matrix(co)[,ncol(co)], Vnames, IsOffset)
+d
   ## Saturated log-likelihood:
   satlogpl <- sum(ok*resp*log(B))
   ## Max. value of log-likelihood:
-  maxlogpl <- logLik(fit) + satlogpl
+  maxlogpl <- NA
 
   # Stamp with spatstat version number
   spv <- package_version(spatstat.geom:::versionstring.spatstat())
@@ -244,7 +229,7 @@ maxnet.logi.engine <- function(Q,
                                  logistic = Dinfo,
                                  computed = computed,
                                  vnamebase=vnamebase,
-                                 vnameprefix=vnameprefix,
+                                 vnameprefix=vnameprefix
                                  ),
               covariates  = spatstat.core:::mpl.usable(covariates),
               covfunargs= covfunargs,
