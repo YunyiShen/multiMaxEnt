@@ -193,7 +193,7 @@ maxnet.logi.engine <- function(Q,
 
   # go
   cat("start glmnet...\n")
-  browser()
+  #browser()
   glmnet::glmnet.control(pmin=1.0e-8, fdev=0) 
   fit <- glmnet::glmnet(x=Xmat[.logi.ok,], y=as.factor(.logi.Y[.logi.ok]), 
     family="binomial", standardize=F, 
