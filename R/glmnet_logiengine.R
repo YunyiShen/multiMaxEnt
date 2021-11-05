@@ -172,7 +172,7 @@ maxnet.logi.engine <- function(Q,
     offset_vec <- rowSums(as.matrix(glmdata[,VN[IsOffset]])) # get this part of offset
     #glmdata <- glmdata[,!colnames(glmdata)%in% VN[IsOffset]] # remove offset
     fmla <- paste(c(fmla, VN), collapse="+")
-    penalty.factor <- c(penalty.factor, rep(0,length(VN)))
+    penalty.factor <- c(penalty.factor, rep(1,length(VN)))
   }
   else {
      offset_vec <- 0
