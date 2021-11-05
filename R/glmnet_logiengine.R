@@ -17,7 +17,8 @@ maxnet.logi.engine <- function(Q,
                         vnameprefix=NULL,
                         justQ = FALSE,
                         savecomputed = FALSE,
-                        precomputed = NULL#,
+                        precomputed = NULL,
+                        trace.it = 1
                         #VB=FALSE
                         ){
   if(is.null(trend)) trend <- ~1 
@@ -173,6 +174,9 @@ maxnet.logi.engine <- function(Q,
     fmla <- paste(c(fmla, VN), collapse="+")
     penalty.factor <- c(penalty.factor, rep(0,length(VN)))
   }
+  else {
+     offset_vec <- 0
+  }
   # add offset intrinsic to logistic technique
   #fmla <- paste(fmla, "offset(-log(.logi.B))", sep="+")
   offset_vec <- offset_vec - log(glmdata[,".logi.B"]) # offset due to the Gibbs part
@@ -188,17 +192,20 @@ maxnet.logi.engine <- function(Q,
   
 
   # go
+  cat("start glmnet...\n")
+  browser()
   glmnet::glmnet.control(pmin=1.0e-8, fdev=0) 
   fit <- glmnet::glmnet(x=Xmat[.logi.ok,], y=as.factor(.logi.Y[.logi.ok]), 
     family="binomial", standardize=F, 
-    penalty.factor=penalty.factor, 
-    lambda=lambda, weights=.logi.w[.logi.ok], offset = offset_vec[.logi.ok])
+    penalty.factor=penalty.factor, lambda=lambda, 
+    weights=.logi.w[.logi.ok], 
+    offset = offset_vec[.logi.ok], trace.it = trace.it)
   
+  co <- coef(fit)
   environment(fit$terms) <- sys.frame(sys.nframe())
   ## Fitted coeffs
-  co <- coef(fit)
   fitin <- spatstat.core:::fii(interaction, as.matrix(co)[,ncol(co)], Vnames, IsOffset)
-d
+
   ## Saturated log-likelihood:
   satlogpl <- sum(ok*resp*log(B))
   ## Max. value of log-likelihood:
