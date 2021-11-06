@@ -21,7 +21,7 @@ maxnet.logi.engine <- function(Q,
                         trace.it = 1
                         #VB=FALSE
                         ){
-  if(is.null(trend)) trend <- ~1 
+  if(is.null(trend)) trend <- ~1
   if(is.null(interaction)) interaction <- spatstat.core:::Poisson()
   want.trend <- !spatstat.utils:::identical.formulae(trend, ~1)
   want.inter <- !spatstat.core:::is.poisson(interaction)
@@ -56,7 +56,7 @@ maxnet.logi.engine <- function(Q,
   D <- Q$dummy
   Dinfo <- Q$param
   Xplus <- Q$data
-  
+
   ## clip to subset?
   if(!is.null(clipwin)) {
     if(is.data.frame(covariates)) {
@@ -67,7 +67,7 @@ maxnet.logi.engine <- function(Q,
     Xplus <- Q$data
     D     <- Q$dummy
   }
-  if (justQ) 
+  if (justQ)
     return(Q)
   ### Dirty way of recording arguments so that the model can be refitted later (should probably be done using call, eval, envir, etc.):
   extraargs <- list(covfunargs = covfunargs, allcovar = allcovar, vnamebase = vnamebase, vnameprefix = vnameprefix)
@@ -85,13 +85,13 @@ maxnet.logi.engine <- function(Q,
   B <- B*rho
   Dinfo <- append(Dinfo, list(B=B))
   Dinfo <- append(Dinfo, list(extraargs=extraargs))
-  # 
+  #
   Wplus <- spatstat.geom::as.owin(Xplus)
   nXplus <- spatstat.geom::npoints(Xplus)
   U <- spatstat.geom::superimpose(Xplus, D, W=Wplus, check=FALSE)
 #  E <- equalpairs(U, Xplus, marked = is.marked(Xplus))
   E <- cbind(1:nXplus, 1:nXplus)
-#  
+#
   computed <- if (savecomputed) list(X = Xplus, Q = Q, U = U) else list()
   # assemble covariate data frame
   if(want.trend || want.subset) {
@@ -115,12 +115,12 @@ maxnet.logi.engine <- function(Q,
     if(wantmarks) cvdf <- cbind(cvdf, marks = spatstat.geom::marks(U))
   } else cvdf <- NULL
   # evaluate interaction sufficient statistics
-  if (!is.null(ss <- interaction$selfstart)) 
+  if (!is.null(ss <- interaction$selfstart))
     interaction <- ss(Xplus, interaction)
   V <- spatstat.core:::evalInteraction(Xplus, U, E, interaction, correction, precomputed = precomputed, savecomputed = savecomputed)
   if(!is.matrix(V))
     stop("evalInteraction did not return a matrix")
-  if (savecomputed) 
+  if (savecomputed)
     computed <- append(computed, attr(V, "computed"))
   IsOffset <- attr(V, "IsOffset")
   if(is.null(IsOffset)) IsOffset <- rep.int(FALSE, ncol(V))
@@ -159,7 +159,7 @@ maxnet.logi.engine <- function(Q,
                    .logi.B = B,
                    .logi.w = wei,
                    .logi.ok =ok)
-  # build glm formula 
+  # build glm formula
   # (reserved names begin with ".logi.")
   trendpart <- paste(as.character(trend), collapse=" ")
   fmla <- paste(".logi.Y ", trendpart)
@@ -181,7 +181,7 @@ maxnet.logi.engine <- function(Q,
   #fmla <- paste(fmla, "offset(-log(.logi.B))", sep="+")
   offset_vec <- offset_vec - log(glmdata[,".logi.B"]) # offset due to the Gibbs part
   fmla <- as.formula(fmla)
-  # to satisfy package checker: 
+  # to satisfy package checker:
   .logi.B <- B
   .logi.w <- wei
   .logi.ok  <- ok
@@ -189,22 +189,22 @@ maxnet.logi.engine <- function(Q,
   # suppress warnings from code checkers
   spatstat.utils:::dont.complain.about(.logi.B, .logi.w, .logi.ok, .logi.Y)
   Xmat <- model.matrix(fmla, glmdata)
-  
+
 
   # go
   cat("start glmnet...\n")
   #browser()
-  glmnet::glmnet.control(pmin=1.0e-8, fdev=0) 
-  fit <- glmnet::glmnet(x=Xmat[.logi.ok,], y=as.factor(.logi.Y[.logi.ok]), 
-    family="binomial", standardize=F, 
-    penalty.factor=penalty.factor, lambda=lambda, 
-    weights=.logi.w[.logi.ok], 
+  glmnet::glmnet.control(pmin=1.0e-8, fdev=0)
+  fit <- glmnet::glmnet(x=Xmat[.logi.ok,], y=as.factor(.logi.Y[.logi.ok]),
+    family="binomial", standardize=F,
+    penalty.factor=penalty.factor, lambda=lambda,
+    weights=.logi.w[.logi.ok],
     offset = offset_vec[.logi.ok], trace.it = trace.it)
-  
+
   co <- coef(fit)
-  environment(fit$terms) <- sys.frame(sys.nframe())
+  #environment(fit$terms) <- sys.frame(sys.nframe())
   ## Fitted coeffs
-  fitin <- spatstat.core:::fii(interaction, as.matrix(co)[,ncol(co)], Vnames, IsOffset)
+  fitin <- spatstat.core:::fii(interaction, as.matrix(co)[,1], Vnames, IsOffset)
 
   ## Saturated log-likelihood:
   satlogpl <- sum(ok*resp*log(B))
@@ -222,7 +222,8 @@ maxnet.logi.engine <- function(Q,
   fit <- list(method      = "logi",
               fitter      = "glmnet",
               projected   = FALSE,
-              coef        = co,
+              coef        = as.matrix( co[,1]),
+              coef_path = co,
               trend       = trend,
               interaction = interaction,
               fitin       = fitin,
@@ -236,7 +237,9 @@ maxnet.logi.engine <- function(Q,
                                  logistic = Dinfo,
                                  computed = computed,
                                  vnamebase=vnamebase,
-                                 vnameprefix=vnameprefix
+                                 vnameprefix=vnameprefix,
+                                 VB = NULL,
+                                 priors = NULL
                                  ),
               covariates  = spatstat.core:::mpl.usable(covariates),
               covfunargs= covfunargs,

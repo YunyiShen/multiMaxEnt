@@ -25,16 +25,16 @@ precomputed = NULL
 
 
 
-n_p <- 50 # presence
-n_d <- 100 # dummy
+n_p <- 300 # presence
+n_d <- 50000 # dummy
 
 
-presence <- data.frame(x = runif(n_p, -100,100), 
-            y = runif(n_p, -100,100), 
+presence <- data.frame(x = runif(n_p, -100,100),
+            y = runif(n_p, -100,100),
             mark = as.factor( rnorm(n_p)>0))
 
-dummy <- data.frame(x = runif(n_d, -100,100), 
-            y = runif(n_d, -100,100), 
+dummy <- data.frame(x = runif(n_d, -100,100),
+            y = runif(n_d, -100,100),
             mark = as.factor( rnorm(n_d)>0))
 
 
@@ -51,10 +51,11 @@ dummy_pp <- ppp(x = dummy[,1],y = dummy[,2], marks = dummy[,3] ,
 
 Q <- quadscheme.logi(pp, dummy_pp)
 
-trend <- ~e1+e2-1
-penalty.factor <- c(1,1)
+trend <- ~e1:marks+e2:marks+marks-1
+penalty.factor <- c(1,1,1,1,1,1)
 lambda <- c(10, 1, 0.1)
 covariates <- rbind(env_p,env_d)
-res_obj <- maxnet.logi.engine(Q, trend, interaction = interaction, 
-            penalty.factor = penalty.factor, lambda = lambda, 
+res_obj <- maxnet.logi.engine(Q, trend, interaction = interaction,
+            penalty.factor = penalty.factor, lambda = lambda,
             covariates = covariates)
+
