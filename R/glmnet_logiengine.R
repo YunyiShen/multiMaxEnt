@@ -6,6 +6,7 @@ glmnet.logi.engine <- function(Q,
                         penalty.factor,
                         lambda,
                         alpha = 1,
+                        cv = FALSE,
                         ...,
                         covariates=NULL,
                         subsetexpr=NULL,
@@ -197,12 +198,23 @@ glmnet.logi.engine <- function(Q,
   cat("start glmnet...\n")
   #browser()
   glmnet::glmnet.control(pmin=1.0e-8, fdev=0)
-  fit <- glmnet::glmnet(x=Xmat[.logi.ok,], y=as.factor(.logi.Y[.logi.ok]),
-    family=binomial(), standardize=TRUE, alpha = alpha,
-    penalty.factor=penalty.factor, lambda=lambda,
-    weights=.logi.w[.logi.ok],
-    intercept = FALSE, 
-    offset = offset_vec[.logi.ok], trace.it = trace.it)
+  if(cv){
+    fit <- glmnet::cv.glmnet(x=Xmat[.logi.ok,], y=as.factor(.logi.Y[.logi.ok]),
+      family=binomial(), standardize=TRUE, alpha = alpha,
+      penalty.factor=penalty.factor, lambda=lambda,
+      weights=.logi.w[.logi.ok],
+      intercept = FALSE, 
+      offset = offset_vec[.logi.ok], trace.it = trace.it)
+  }
+  else {
+    fit <- glmnet::glmnet(x=Xmat[.logi.ok,], y=as.factor(.logi.Y[.logi.ok]),
+      family=binomial(), standardize=TRUE, alpha = alpha,
+      penalty.factor=penalty.factor, lambda=lambda,
+      weights=.logi.w[.logi.ok],
+      intercept = FALSE, 
+      offset = offset_vec[.logi.ok], trace.it = trace.it)
+  }
+  
 
   
 
@@ -214,17 +226,26 @@ glmnet.logi.engine <- function(Q,
   ## Saturated log-likelihood:
   satlogpl <- sum(ok*resp*log(B))
   ## Max. value of log-likelihood:
-  pred <- predict(fit, newx = Xmat[.logi.ok,], newoffset = fit$offset, type = "response")
+  pred <- predict(fit, newx = Xmat[.logi.ok,], newoffset = offset_vec[.logi.ok], type = "response")
   #browser()
-  maxlogpl <- sapply(1:length(fit$lambda), function(i){
-    glmnet:::obj_function(y=as.numeric(.logi.Y[.logi.ok]), mu = pred[,i], 
+  if(cv){
+    maxlogpl <- glmnet:::obj_function(y=as.numeric(.logi.Y[.logi.ok]), mu = pred, 
+                        family = binomial(),
+                        weights=.logi.w[.logi.ok],
+                        lambda = fit$lambda,
+                        alpha = alpha, coefficients = co,
+                        vp = penalty.factor)
+  }
+  else{
+    maxlogpl <- sapply(1:length(fit$lambda), function(i){
+      glmnet:::obj_function(y=as.numeric(.logi.Y[.logi.ok]), mu = pred[,i], 
                         family = binomial(),
                         weights=.logi.w[.logi.ok],
                         lambda = fit$lambda[i],
                         alpha = alpha, coefficients = co[,i],
                         vp = penalty.factor)
-  })
-  
+      })
+  }
 
   # Stamp with spatstat version number
   spv <- package_version(spatstat.geom:::versionstring.spatstat())
@@ -237,8 +258,8 @@ glmnet.logi.engine <- function(Q,
   fit <- list(method      = "logi",
               fitter      = "glmnet",
               projected   = FALSE,
-              coef        = as.matrix( co[,1]),
-              coef_path = co,
+              coef        = if(cv) co else as.matrix( co[,1]),
+              coef_path   = if(cv) NULL else co,
               trend       = trend,
               interaction = interaction,
               fitin       = fitin,
@@ -259,8 +280,8 @@ glmnet.logi.engine <- function(Q,
                                  local_pred = pred
                                  ),
               covariates  = spatstat.core:::mpl.usable(covariates),
-              covfunargs= covfunargs,
-              subsetexpr = subsetexpr,
+              covfunargs  = covfunargs,
+              subsetexpr  = subsetexpr,
               correction  = correction,
               rbord       = rbord,
               fisher      = NULL,
