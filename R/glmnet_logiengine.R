@@ -1,10 +1,11 @@
 ## use glmnet to fit the Gibbs process, used some internal function in spatstat, developed under spatstat version 2.2.2
 
-maxnet.logi.engine <- function(Q,
+glmnet.logi.engine <- function(Q,
                         trend = ~-1,
                         interaction,
                         penalty.factor,
                         lambda,
+                        alpha = 1,
                         ...,
                         covariates=NULL,
                         subsetexpr=NULL,
@@ -188,6 +189,7 @@ maxnet.logi.engine <- function(Q,
   .logi.Y   <- resp
   # suppress warnings from code checkers
   spatstat.utils:::dont.complain.about(.logi.B, .logi.w, .logi.ok, .logi.Y)
+  #browser()
   Xmat <- model.matrix(fmla, glmdata)
 
 
@@ -196,12 +198,15 @@ maxnet.logi.engine <- function(Q,
   #browser()
   glmnet::glmnet.control(pmin=1.0e-8, fdev=0)
   fit <- glmnet::glmnet(x=Xmat[.logi.ok,], y=as.factor(.logi.Y[.logi.ok]),
-    family="binomial", standardize=F,
+    family=binomial(), standardize=TRUE, alpha = alpha,
     penalty.factor=penalty.factor, lambda=lambda,
     weights=.logi.w[.logi.ok],
+    intercept = FALSE, 
     offset = offset_vec[.logi.ok], trace.it = trace.it)
 
-  co <- coef(fit)
+  
+
+  co <- coef(fit)[-1,]
   #environment(fit$terms) <- sys.frame(sys.nframe())
   ## Fitted coeffs
   fitin <- spatstat.core:::fii(interaction, as.matrix(co)[,1], Vnames, IsOffset)
@@ -209,7 +214,17 @@ maxnet.logi.engine <- function(Q,
   ## Saturated log-likelihood:
   satlogpl <- sum(ok*resp*log(B))
   ## Max. value of log-likelihood:
-  maxlogpl <- NA
+  pred <- predict(fit, newx = Xmat[.logi.ok,], newoffset = fit$offset, type = "response")
+  #browser()
+  maxlogpl <- sapply(1:length(fit$lambda), function(i){
+    glmnet:::obj_function(y=as.numeric(.logi.Y[.logi.ok]), mu = pred[,i], 
+                        family = binomial(),
+                        weights=.logi.w[.logi.ok],
+                        lambda = fit$lambda[i],
+                        alpha = alpha, coefficients = co[,i],
+                        vp = penalty.factor)
+  })
+  
 
   # Stamp with spatstat version number
   spv <- package_version(spatstat.geom:::versionstring.spatstat())
@@ -233,13 +248,15 @@ maxnet.logi.engine <- function(Q,
               internal    = list(Vnames  = Vnames,
                                  IsOffset=IsOffset,
                                  glmdata = glmdata,
+                                 Xmat = Xmat,
                                  glmfit = fit,
                                  logistic = Dinfo,
                                  computed = computed,
                                  vnamebase=vnamebase,
                                  vnameprefix=vnameprefix,
                                  VB = NULL,
-                                 priors = NULL
+                                 priors = NULL,
+                                 local_pred = pred
                                  ),
               covariates  = spatstat.core:::mpl.usable(covariates),
               covfunargs= covfunargs,
